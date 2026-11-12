@@ -8,6 +8,12 @@ The release workflow publishes the tagged version's section below as the GitHub
 release notes, so a version's section must be complete before its tag is pushed
 (see the Release process section of CLAUDE.md).
 
+## 0.8.1 - 2026-11-12
+
+### Fixed
+
+- **Wide** mode now stays between Obsidian's sidebars, follows sidebar resizing, and fits the diagram to the available space.
+
 ## 0.8.0 - 2026-11-12
 
 ### Added
