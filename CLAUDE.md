@@ -252,6 +252,18 @@ name; the manifest id inside is `drawio-editor`).
     and the in-main-window file view never showed the bug, making it look
     window-specific. Diagnose with the drawio handshake: `configure` received but no
     `init` follow-up ⇒ the reply isn't reaching drawio ⇒ it's the send side.
+- **The interactive viewer's Wide mode renders in the top layer (`popover="manual"`
+  + `showPopover()`), not as a plain `position: fixed` overlay.** Obsidian's
+  `app.css` sets `.workspace-leaf { contain: strict !important }` and
+  `.markdown-source-view.mod-cm6 .cm-content>[contenteditable=false] { contain: paint !important }`;
+  both make that ancestor the containing block of fixed descendants and clip
+  to it, so a fixed overlay lands offset (the sidebar offset is applied twice)
+  and gets cut off at the leaf/embed edges (0.8.0/0.8.1 bug). Also, embed roots
+  match `.internal-embed:not(.image-embed) { display: block }` (specificity
+  0,2,0), so the expanded-mode rules in `styles.css` use two-class selectors
+  to keep their flex column, which the fit depends on. jsdom can't lay any of
+  this out; verify layout changes in a real Chromium against those Obsidian
+  rules.
 - **`Vault.createFolder()` requires Obsidian 1.4.0+** (it carries a `@since 1.4.0`
   JSDoc tag in `obsidian.d.ts`). `src/file/createDiagram.ts` originally called it
   unguarded, tripping `obsidianmd/no-unsupported-api` while `minAppVersion` was

@@ -325,6 +325,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
 
   private startWideLayout(): void {
     this.disconnectWideObserver();
+    this.enterTopLayer();
     this.wideHost = this.root.closest<HTMLElement>('.workspace-split.mod-root')
       ?? this.doc.querySelector<HTMLElement>('.workspace-split.mod-root');
     const win = this.doc.defaultView;
@@ -344,8 +345,45 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.root.style.height = `${rect.height}px`;
   }
 
+  /**
+   * Obsidian gives every `.workspace-leaf` `contain: strict` and every Live
+   * Preview widget `contain: paint`. Either makes that ancestor the containing
+   * block of `position: fixed` descendants and clips them to its box, so a
+   * fixed overlay inside a note lands offset from the workspace coordinates
+   * it was given and is cut off at the leaf/embed edges. The top layer (a
+   * manual popover, the same layer native fullscreen uses) is the only
+   * rendering context that escapes containment without moving the element out
+   * of the editor's DOM. Manual popovers ignore Escape and outside clicks, so
+   * the viewer's own exit paths stay in charge. Hosts without the Popover API
+   * keep the plain fixed overlay.
+   */
+  private enterTopLayer(): void {
+    const root = this.root;
+    if (typeof root.showPopover !== 'function') return;
+    root.setAttribute('popover', 'manual');
+    let open = false;
+    try { open = root.matches(':popover-open'); } catch { /* engine without the pseudo-class */ }
+    // Re-entry after a popout move: adopting the node into another document
+    // hides the popover, so show it again in the new window.
+    if (open) return;
+    try {
+      root.showPopover();
+    } catch {
+      root.removeAttribute('popover');
+    }
+  }
+
+  private leaveTopLayer(): void {
+    if (!this.root.hasAttribute('popover')) return;
+    try {
+      this.root.hidePopover();
+    } catch { /* already hidden, e.g. after a move between windows */ }
+    this.root.removeAttribute('popover');
+  }
+
   private stopWideLayout(): void {
     this.disconnectWideObserver();
+    this.leaveTopLayer();
     this.root.style.removeProperty('left');
     this.root.style.removeProperty('top');
     this.root.style.removeProperty('width');

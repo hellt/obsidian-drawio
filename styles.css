@@ -75,16 +75,26 @@ body.drawio-align-left .drawio-preview > svg { margin: 0; }
 }
 .drawio-interactive-active .drawio-interactive-resize-handle { display: block; }
 .drawio-interactive-resizing { cursor: ns-resize; }
-.drawio-interactive-wide {
+/* Expanded modes. Two-class selectors so they outrank Obsidian's
+   `.internal-embed:not(.image-embed) { display: block }` on embed roots —
+   without the flex column the viewport never stretches, so the diagram
+   cannot fit the expanded area. */
+.drawio-interactive.drawio-interactive-wide {
+  /* Shown in the top layer as a manual popover (see enterTopLayer) with
+     left/top/width/height set inline from the center workspace; this block
+     also resets the UA [popover] size, border, overflow, and colors. no-drag
+     keeps the strip over the macOS tab-bar drag region clickable/pannable. */
   position: fixed; z-index: var(--layer-modal); inset: 0;
-  max-width: none; margin: 0;
+  width: auto; height: auto; max-width: none; margin: 0;
+  border: 0; overflow: hidden; color: inherit;
+  -webkit-app-region: no-drag;
 }
-.drawio-interactive-wide,
-.drawio-interactive-fullscreen {
+.drawio-interactive.drawio-interactive-wide,
+.drawio-interactive.drawio-interactive-fullscreen {
   box-sizing: border-box; display: flex; flex-direction: column;
   padding: 12px; background: var(--background-primary);
 }
-.drawio-interactive-fullscreen { width: 100%; height: 100%; }
+.drawio-interactive.drawio-interactive-fullscreen { width: 100%; height: 100%; }
 .drawio-interactive-wide .drawio-interactive-viewport,
 .drawio-interactive-fullscreen .drawio-interactive-viewport {
   flex: 1 1 auto; min-height: 0; height: auto !important;

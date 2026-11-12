@@ -275,6 +275,49 @@ describe('InteractiveViewerController walking skeleton', () => {
     controller.dispose();
   });
 
+  it('shows wide view in the top layer so Obsidian leaf containment cannot trap or clip it', () => {
+    // Obsidian's `.workspace-leaf { contain: strict }` (and `contain: paint`
+    // on Live Preview widgets) turns a `position: fixed` overlay inside a note
+    // into one positioned and clipped by the leaf/embed box. A manual popover
+    // escapes that; jsdom has no Popover API, so stub it on the root.
+    const { root, preview, controller } = fixture();
+    const showPopover = vi.fn();
+    const hidePopover = vi.fn();
+    Object.defineProperty(root, 'showPopover', { configurable: true, value: showPopover });
+    Object.defineProperty(root, 'hidePopover', { configurable: true, value: hidePopover });
+    const wide = root.querySelector<HTMLButtonElement>('[aria-label="Enter wide view"]')!;
+    preview.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    wide.click();
+    expect(root.getAttribute('popover')).toBe('manual');
+    expect(showPopover).toHaveBeenCalledTimes(1);
+
+    root.querySelector<HTMLButtonElement>('[aria-label="Exit wide view"]')!.click();
+    expect(hidePopover).toHaveBeenCalledTimes(1);
+    expect(root.hasAttribute('popover')).toBe(false);
+
+    wide.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(hidePopover).toHaveBeenCalledTimes(2);
+    expect(root.hasAttribute('popover')).toBe(false);
+
+    preview.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    wide.click();
+    expect(showPopover).toHaveBeenCalledTimes(3);
+    controller.dispose();
+    expect(hidePopover).toHaveBeenCalledTimes(3);
+    expect(root.hasAttribute('popover')).toBe(false);
+  });
+
+  it('keeps the plain fixed overlay when the host has no Popover API', () => {
+    const { root, preview, controller } = fixture();
+    preview.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    root.querySelector<HTMLButtonElement>('[aria-label="Enter wide view"]')!.click();
+    expect(root.classList.contains('drawio-interactive-wide')).toBe(true);
+    expect(root.hasAttribute('popover')).toBe(false);
+    controller.dispose();
+  });
+
   it('tracks the center workspace and fits the diagram as sidebar space changes', () => {
     const { root, preview, svg, controller } = fixture();
     const workspace = document.body.createDiv({ cls: 'workspace-split mod-root' });
