@@ -46,7 +46,7 @@
 
 - **Open built-in editor**（默认）—— 代码块预览打开全屏编辑器；嵌入打开快速编辑模态框。
 - **Open in system default app** —— 用系统默认应用打开对应的 `.drawio` 文件。代码块没有对应文件，因此仍会打开内置编辑器。
-- **Interactive viewer** —— 在原位浏览图表（滚轮/触控板缩放、拖拽平移、**Fit**、**Wide**、**Full screen**）。**Wide** 填满 Obsidian 窗口，**Full screen** 则填满整个显示器。要改图时点 **Edit**；**Edit button action** 决定它打开内置编辑器还是系统默认应用（代码块始终使用内置编辑器）。拖动代码块或嵌入预览下方的手柄可调整高度 —— 按笔记中的每一处插入单独记住（该代码块或嵌入上方会写入 `<!-- drawio-viewer: height=N -->` 注释），并在实时预览与阅读视图之间保持同步。
+- **Interactive viewer** —— 在原位浏览图表（滚轮/触控板缩放、拖拽平移、**Fit**、**Wide**、**Full screen**）。**Wide** 填满 Obsidian 两侧边栏之间的空间，并随边栏调整而缩放；**Full screen** 则填满整个显示器。要改图时点 **Edit**；**Edit button action** 决定它打开内置编辑器还是系统默认应用（代码块始终使用内置编辑器）。拖动代码块或嵌入预览下方的手柄可调整高度 —— 按笔记中的每一处插入单独记住（该代码块或嵌入上方会写入 `<!-- drawio-viewer: height=N -->` 注释），并在实时预览与阅读视图之间保持同步。
 - **Do nothing** —— 预览不可点击。
 
 交互式预览适用于 `` ```drawio `` 代码块、`![[file.drawio]]` 嵌入，以及只读的 `.drawio` 文件标签页。直接打开 `.drawio` 文件时仍使用内嵌编辑器，除非开启了 **Open diagram files read-only**。`![[file.drawio.svg]]` / `![[file.drawio.png]]` 嵌入在实时预览和阅读视图中都遵循同一设置，但 **Interactive viewer** 会回退到编辑器 —— 它们显示为原生图片，没有可缩放的 SVG。

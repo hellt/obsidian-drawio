@@ -275,6 +275,68 @@ describe('InteractiveViewerController walking skeleton', () => {
     controller.dispose();
   });
 
+  it('tracks the center workspace and fits the diagram as sidebar space changes', () => {
+    const { root, preview, svg, controller } = fixture();
+    const workspace = document.body.createDiv({ cls: 'workspace-split mod-root' });
+    workspace.appendChild(root);
+    let bounds = {
+      left: 300, top: 100, width: 900, height: 700,
+      right: 1200, bottom: 800, x: 300, y: 100, toJSON: () => ({}),
+    };
+    vi.spyOn(workspace, 'getBoundingClientRect').mockImplementation(() => bounds);
+    const callbacks: Array<() => void> = [];
+    const observed: Element[][] = [];
+    class FakeResizeObserver {
+      private elements: Element[] = [];
+      constructor(callback: () => void) {
+        callbacks.push(callback);
+        observed.push(this.elements);
+      }
+      observe(el: Element): void { this.elements.push(el); }
+      disconnect = vi.fn();
+      unobserve(): void { /* not used */ }
+    }
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    try {
+      preview.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      root.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click();
+      frames.shift()!(0);
+      expect(svg.getAttribute('viewBox')).not.toBe('0 0 200 100');
+
+      root.querySelector<HTMLButtonElement>('[aria-label="Enter wide view"]')!.click();
+      frames.shift()!(0);
+
+      expect(root.style.left).toBe('300px');
+      expect(root.style.top).toBe('100px');
+      expect(root.style.width).toBe('900px');
+      expect(root.style.height).toBe('700px');
+      expect(svg.getAttribute('viewBox')).toBe('0 0 200 100');
+
+      bounds = {
+        left: 180, top: 100, width: 1240, height: 700,
+        right: 1420, bottom: 800, x: 180, y: 100, toJSON: () => ({}),
+      };
+      const observerIndex = observed.findIndex((elements) => elements.includes(workspace));
+      expect(observerIndex).toBeGreaterThanOrEqual(0);
+      callbacks[observerIndex]!();
+
+      expect(root.style.left).toBe('180px');
+      expect(root.style.width).toBe('1240px');
+      root.querySelector<HTMLButtonElement>('[aria-label="Exit wide view"]')!.click();
+      expect(root.style.left).toBe('');
+      expect(root.style.width).toBe('');
+      controller.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+      raf.mockRestore();
+    }
+  });
+
   it('enters and exits fullscreen through the preview document', () => {
     const { root, preview, controller } = fixture();
     const descriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');

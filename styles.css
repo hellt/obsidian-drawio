@@ -77,7 +77,7 @@ body.drawio-align-left .drawio-preview > svg { margin: 0; }
 .drawio-interactive-resizing { cursor: ns-resize; }
 .drawio-interactive-wide {
   position: fixed; z-index: var(--layer-modal); inset: 0;
-  width: 100vw; height: 100vh; max-width: none; margin: 0;
+  max-width: none; margin: 0;
 }
 .drawio-interactive-wide,
 .drawio-interactive-fullscreen {

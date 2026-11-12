@@ -73,6 +73,9 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private panStartBox: ViewBox | null = null;
   /** Watches a detached/hidden preview until layout gives it a real width. */
   private measureObserver: ResizeObserver | null = null;
+  /** Keeps wide mode aligned with Obsidian's center workspace as sidebars resize. */
+  private wideObserver: ResizeObserver | null = null;
+  private wideHost: HTMLElement | null = null;
 
   constructor(
     private root: HTMLElement,
@@ -222,6 +225,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
       this.disconnectMeasureObserver();
       this.observeUntilMeasurable();
     }
+    if (this.wide) this.startWideLayout();
   }
 
   private createToolbar(): HTMLElement {
@@ -308,6 +312,8 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     const expanded = fullscreen || this.wide;
     this.root.classList.toggle('drawio-interactive-fullscreen', fullscreen);
     this.root.classList.toggle('drawio-interactive-wide', this.wide);
+    if (this.wide) this.startWideLayout();
+    else this.stopWideLayout();
     this.wideButton.hidden = expanded;
     this.fullscreenButton.hidden = expanded;
     this.closeFullscreenButton.hidden = !expanded;
@@ -315,6 +321,41 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.closeFullscreenButton.setAttribute(
       'aria-label', fullscreen ? 'Exit full screen' : 'Exit wide view',
     );
+  }
+
+  private startWideLayout(): void {
+    this.disconnectWideObserver();
+    this.wideHost = this.root.closest<HTMLElement>('.workspace-split.mod-root')
+      ?? this.doc.querySelector<HTMLElement>('.workspace-split.mod-root');
+    const win = this.doc.defaultView;
+    if (this.wideHost && win && typeof win.ResizeObserver === 'function') {
+      this.wideObserver = new win.ResizeObserver(() => this.updateWideLayout());
+      this.wideObserver.observe(this.wideHost);
+    }
+    this.updateWideLayout();
+  }
+
+  private updateWideLayout(): void {
+    if (!this.wide || !this.wideHost) return;
+    const rect = this.wideHost.getBoundingClientRect();
+    this.root.style.left = `${rect.left}px`;
+    this.root.style.top = `${rect.top}px`;
+    this.root.style.width = `${rect.width}px`;
+    this.root.style.height = `${rect.height}px`;
+  }
+
+  private stopWideLayout(): void {
+    this.disconnectWideObserver();
+    this.root.style.removeProperty('left');
+    this.root.style.removeProperty('top');
+    this.root.style.removeProperty('width');
+    this.root.style.removeProperty('height');
+  }
+
+  private disconnectWideObserver(): void {
+    this.wideObserver?.disconnect();
+    this.wideObserver = null;
+    this.wideHost = null;
   }
 
   private onWheel = (event: WheelEvent): void => {
@@ -391,6 +432,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     if (!this.active || this.doc.fullscreenElement === this.root) return;
     this.wide = true;
     this.updateExpandedMode();
+    this.fit();
   }
 
   private async closeExpandedView(): Promise<void> {
@@ -477,6 +519,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   };
 
   private onWindowResize = (): void => {
+    this.updateWideLayout();
     // Same isEnabled gate as every other entry point: after the click action
     // is switched away, a window resize must not re-apply the viewport.
     if (this.manuallyResized || this.opts.isEnabled?.() === false) return;
