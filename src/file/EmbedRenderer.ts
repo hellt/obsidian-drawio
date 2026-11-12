@@ -6,6 +6,7 @@ import {
   resolveClickAction, resolveEditButtonAction, openWithDefaultApp,
 } from '../preview/clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from '../preview/interactiveMount';
+import { renderDiagramPng } from '../preview/diagramPng';
 import { SectionLifecycle } from '../preview/sectionLifecycle';
 import {
   readEmbedViewportHeight, writeEmbedViewportHeight,
@@ -249,6 +250,9 @@ class DrawioFileEmbed extends MarkdownRenderChild {
               openWithDefaultApp(this.plugin.app, this.file.path);
             }
           },
+          renderPng: () => renderDiagramPng(
+            xml, this.currentPage, this.plugin.settings.pngExportScale, preview.ownerDocument,
+          ),
         });
         scheduleStoredEmbedHeight(
           this.plugin, this.interactive, this.sourcePath, this.file, this.subpath,
@@ -422,7 +426,7 @@ async function renderEmbedInto(
     const xml = await plugin.app.vault.read(file);
     const wrapped = ensureMxfile(xml);
     const pages = getDiagramPages(wrapped);
-    const currentPage = resolvePageFromSubpath(pages, subpath);
+    let currentPage = resolvePageFromSubpath(pages, subpath);
     let interactive: InteractiveMountHandle | null = null;
     let initialHeight: number | null = null;
     if (Platform.isDesktopApp &&
@@ -446,6 +450,7 @@ async function renderEmbedInto(
         pages,
         initialPage: currentPage,
         onPageChange: (page) => {
+          currentPage = page;
           renderPreview(preview, xml, { ...plugin.previewOpts(), page });
           interactive?.bindSvg(preview.querySelector('svg'), { preserveViewportHeight: true });
         },
@@ -489,6 +494,9 @@ async function renderEmbedInto(
               openWithDefaultApp(plugin.app, file.path);
             }
           },
+          renderPng: () => renderDiagramPng(
+            xml, currentPage, plugin.settings.pngExportScale, preview.ownerDocument,
+          ),
         });
         interactive = mounted;
         // Single teardown seam: dispose covers both the lazy listeners and

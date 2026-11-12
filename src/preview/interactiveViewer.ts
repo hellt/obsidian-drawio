@@ -1,4 +1,4 @@
-import { MarkdownRenderChild } from 'obsidian';
+import { MarkdownRenderChild, Notice } from 'obsidian';
 import { MAX_VIEWPORT_HEIGHT, MIN_VIEWPORT_HEIGHT } from './viewportHeight';
 
 export interface InteractiveViewerOptions {
@@ -7,6 +7,8 @@ export interface InteractiveViewerOptions {
   initialHeight?: number;
   onHeightCommit?: (height: number) => void;
   onEdit?: () => void;
+  /** Renders the page currently shown as a PNG for the Copy button. */
+  renderPng?: () => Promise<Blob>;
 }
 
 export interface BindSvgOptions {
@@ -37,6 +39,9 @@ const MAX_SCALE = 8;
 const SCALE_EPSILON = 0.0001;
 /** Pointer travel (px) below which a resize gesture is a click, not a resize. */
 const RESIZE_COMMIT_THRESHOLD = 2;
+const COPY_LABEL = 'Copy';
+/** How long the Copy button shows its "Copied"/"Copy failed" outcome. */
+const COPY_FEEDBACK_MS = 1500;
 
 /**
  * Minimal interactive-viewer lifecycle and activation shell.
@@ -58,6 +63,9 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private wideButton!: HTMLButtonElement;
   private fullscreenButton!: HTMLButtonElement;
   private editButton!: HTMLButtonElement;
+  private copyButton!: HTMLButtonElement;
+  private copying = false;
+  private copyFeedbackTimer: number | null = null;
   private closeFullscreenButton!: HTMLButtonElement;
   private resizeHandle: HTMLElement;
   private doc: Document;
@@ -175,6 +183,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.doc.removeEventListener('pointerup', this.onPanEnd);
     this.disconnectMeasureObserver();
     this.cancelFrame();
+    this.clearCopyFeedback();
     this.toolbar.remove();
     this.resizeHandle.remove();
     this.preview.classList.remove('drawio-interactive-viewport');
@@ -236,6 +245,9 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.fitButton = this.createButton(toolbar, 'Fit', 'Fit diagram', () => this.fit());
     this.editButton = this.createButton(
       toolbar, 'Edit', 'Edit diagram', () => { void this.runEditAction(); },
+    );
+    this.copyButton = this.createButton(
+      toolbar, COPY_LABEL, 'Copy diagram as PNG', () => { void this.runCopyAction(); },
     );
     this.wideButton = this.createButton(
       toolbar, 'Wide', 'Enter wide view', () => this.enterWide(),
@@ -701,6 +713,65 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.wideButton.disabled = !ready;
     this.fullscreenButton.disabled = !ready || typeof this.root.requestFullscreen !== 'function';
     this.editButton.disabled = !ready || this.opts.onEdit === undefined;
+    this.copyButton.disabled = !ready || this.copying || !this.canCopy();
+  }
+
+  private canCopy(): boolean {
+    const win = this.doc.defaultView;
+    return this.opts.renderPng !== undefined && !!win
+      && typeof win.ClipboardItem === 'function'
+      && typeof win.navigator.clipboard?.write === 'function';
+  }
+
+  private async runCopyAction(): Promise<void> {
+    const render = this.opts.renderPng;
+    const win = this.doc.defaultView;
+    if (!render || !win || this.copying || !this.canCopy()) return;
+    this.copying = true;
+    this.showCopyLabel('Copying…', false);
+    this.updateControls();
+    let renderError: unknown = null;
+    const png = render().catch((err: unknown) => {
+      renderError = err;
+      throw err;
+    });
+    png.catch(() => { /* reported below, from the write's rejection */ });
+    try {
+      // Hand the clipboard a pending PNG instead of awaiting the render
+      // first: the write is issued while this click still has focus.
+      await win.navigator.clipboard.write([new win.ClipboardItem({ 'image/png': png })]);
+      this.showCopyLabel('Copied', true);
+    } catch (err) {
+      const cause = renderError ?? err;
+      console.error('[drawio] copy as PNG failed:', cause);
+      this.showCopyLabel('Copy failed', true);
+      new Notice(`Drawio: could not copy the diagram — ${String(cause)}`);
+    } finally {
+      this.copying = false;
+      this.updateControls();
+    }
+  }
+
+  /**
+   * In-button feedback: Obsidian's notices render beneath native fullscreen
+   * and the top-layer wide view, so the button itself reports the outcome.
+   */
+  private showCopyLabel(label: string, revert: boolean): void {
+    this.clearCopyFeedback();
+    this.copyButton.textContent = label;
+    if (!revert || this.disposed) return;
+    const win = this.doc.defaultView;
+    if (!win) return;
+    this.copyFeedbackTimer = win.setTimeout(() => {
+      this.copyFeedbackTimer = null;
+      this.copyButton.textContent = COPY_LABEL;
+    }, COPY_FEEDBACK_MS);
+  }
+
+  private clearCopyFeedback(): void {
+    if (this.copyFeedbackTimer === null) return;
+    this.doc.defaultView?.clearTimeout(this.copyFeedbackTimer);
+    this.copyFeedbackTimer = null;
   }
 
   private scheduleViewBoxWrite(): void {

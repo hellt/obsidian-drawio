@@ -3,6 +3,7 @@ import { renderPreview } from '../preview/ViewerRenderer';
 import { renderPageControl } from '../preview/pageControl';
 import { resolveClickAction, resolveEditButtonAction } from '../preview/clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from '../preview/interactiveMount';
+import { renderDiagramPng } from '../preview/diagramPng';
 import { SectionLifecycle } from '../preview/sectionLifecycle';
 import {
   readCodeBlockViewportHeight, writeCodeBlockViewportHeight,
@@ -83,6 +84,9 @@ async function renderCodeBlock(
             plugin.openEditor(new CodeBlockSource(plugin.app, ctx, el, source));
           }
         },
+        renderPng: () => renderDiagramPng(
+          source, currentPage, plugin.settings.pngExportScale, preview.ownerDocument,
+        ),
       });
       interactive = handle;
       lifecycle.register(() => handle.dispose());

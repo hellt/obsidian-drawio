@@ -4,6 +4,7 @@ import { renderPreview } from './ViewerRenderer';
 import { renderPageControl } from './pageControl';
 import { resolveClickAction, resolveEditButtonAction, openWithDefaultApp } from './clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from './interactiveMount';
+import { renderDiagramPng } from './diagramPng';
 import { getDiagramPages, ensureMxfile } from '../model/xmlUtils';
 import { FileSource } from '../file/FileSource';
 import type DrawioPlugin from '../main';
@@ -61,7 +62,8 @@ export class DrawioPreviewFileView extends TextFileView {
 
     const preview = c.createDiv({ cls: 'drawio-preview' });
     const pages = getDiagramPages(ensureMxfile(this.data));
-    renderPreview(preview, this.data, { ...this.plugin.previewOpts(), page: 0 });
+    let currentPage = 0;
+    renderPreview(preview, this.data, { ...this.plugin.previewOpts(), page: currentPage });
 
     if (pages.length > 1) {
       const pageControlEl = c.createDiv({ cls: 'drawio-page-control' });
@@ -69,6 +71,7 @@ export class DrawioPreviewFileView extends TextFileView {
         pages,
         initialPage: 0,
         onPageChange: (page) => {
+          currentPage = page;
           renderPreview(preview, this.data, { ...this.plugin.previewOpts(), page });
           this.interactive?.bindSvg(preview.querySelector('svg'), { preserveViewportHeight: true });
         },
@@ -88,6 +91,9 @@ export class DrawioPreviewFileView extends TextFileView {
             openWithDefaultApp(this.plugin.app, this.file.path);
           }
         },
+        renderPng: () => renderDiagramPng(
+          this.data, currentPage, this.plugin.settings.pngExportScale, preview.ownerDocument,
+        ),
       });
     }
   }

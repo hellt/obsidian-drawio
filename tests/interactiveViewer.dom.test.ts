@@ -46,7 +46,7 @@ describe('InteractiveViewerController walking skeleton', () => {
     expect(root.classList.contains('drawio-interactive-active')).toBe(false);
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('.drawio-interactive-toolbar button'));
     expect(buttons.map((button) => button.textContent)).toEqual([
-      '+', '−', 'Fit', 'Edit', 'Wide', 'Full screen', '×',
+      '+', '−', 'Fit', 'Edit', 'Copy', 'Wide', 'Full screen', '×',
     ]);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     controller.dispose();
@@ -163,7 +163,7 @@ describe('InteractiveViewerController walking skeleton', () => {
     const zoomOut = toolbarButtons[1]!;
     const fit = toolbarButtons[2]!;
     const edit = toolbarButtons[3]!;
-    const fullscreen = toolbarButtons[5]!;
+    const fullscreen = root.querySelector<HTMLButtonElement>('[aria-label="Enter full screen"]')!;
     expect(zoomIn.disabled).toBe(false);
     expect(zoomOut.disabled).toBe(true);
     expect(fit.disabled).toBe(true);

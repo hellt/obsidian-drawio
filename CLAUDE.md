@@ -264,6 +264,12 @@ name; the manifest id inside is `drawio-editor`).
   to keep their flex column, which the fit depends on. jsdom can't lay any of
   this out; verify layout changes in a real Chromium against those Obsidian
   rules.
+- **The viewer's Copy button rasterizes a fresh light-theme `renderPreview` of the
+  shown page on a canvas (`src/preview/diagramPng.ts`) — it deliberately does NOT
+  use `HeadlessExporter`.** The headless drawio export needs the ~145 MB offline
+  editor installed (or Online mode), takes a second or more, and stalls in popout
+  windows; the bundled viewer has none of those limits and its output matched
+  drawio's for HTML labels and fonts when checked in Chromium.
 - **`Vault.createFolder()` requires Obsidian 1.4.0+** (it carries a `@since 1.4.0`
   JSDoc tag in `obsidian.d.ts`). `src/file/createDiagram.ts` originally called it
   unguarded, tripping `obsidianmd/no-unsupported-api` while `minAppVersion` was
