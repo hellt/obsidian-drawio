@@ -8,6 +8,16 @@ The release workflow publishes the tagged version's section below as the GitHub
 release notes, so a version's section must be complete before its tag is pushed
 (see the Release process section of CLAUDE.md).
 
+## 0.8.2 - 2026-11-12
+
+### Added
+
+- **Copy** in the interactive viewer puts the page you're viewing on the clipboard as a PNG at the **PNG export scale**. It works offline and doesn't need the offline editor installed.
+
+### Fixed
+
+- **Wide** mode now fills the space between Obsidian's sidebars and fits the diagram to it, instead of appearing shifted to the right and cut off.
+
 ## 0.8.1 - 2026-11-12
 
 ### Fixed
