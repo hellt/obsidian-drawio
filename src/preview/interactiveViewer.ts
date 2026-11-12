@@ -41,8 +41,8 @@ const RESIZE_COMMIT_THRESHOLD = 2;
 /**
  * Minimal interactive-viewer lifecycle and activation shell.
  *
- * Zoom, pan, Edit, and fullscreen are intentionally added by later stages. This
- * walking skeleton only owns activation, exit, a placeholder toolbar, and cleanup.
+ * Zoom, pan, Edit, wide view, and fullscreen are intentionally added by later stages.
+ * This walking skeleton only owns activation, exit, a placeholder toolbar, and cleanup.
  */
 export class InteractiveViewerController extends MarkdownRenderChild {
   private active = false;
@@ -55,6 +55,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private zoomInButton!: HTMLButtonElement;
   private zoomOutButton!: HTMLButtonElement;
   private fitButton!: HTMLButtonElement;
+  private wideButton!: HTMLButtonElement;
   private fullscreenButton!: HTMLButtonElement;
   private editButton!: HTMLButtonElement;
   private closeFullscreenButton!: HTMLButtonElement;
@@ -62,6 +63,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private doc: Document;
   private viewportInitialized = false;
   private manuallyResized = false;
+  private wide = false;
   private resizeStartY = 0;
   private resizeStartHeight = 0;
   private resizeMoved = false;
@@ -139,7 +141,9 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   deactivate(): void {
     this.endPan();
     this.active = false;
+    this.wide = false;
     this.root.classList.remove('drawio-interactive-active');
+    this.updateExpandedMode();
     this.updateControls();
   }
 
@@ -155,6 +159,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     }
     this.deactivate();
     this.root.classList.remove('drawio-interactive');
+    this.root.classList.remove('drawio-interactive-wide');
     this.root.classList.remove('drawio-interactive-fullscreen');
     this.root.removeEventListener('click', this.onRootClick);
     this.preview.removeEventListener('wheel', this.onWheel);
@@ -228,11 +233,14 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.editButton = this.createButton(
       toolbar, 'Edit', 'Edit diagram', () => { void this.runEditAction(); },
     );
+    this.wideButton = this.createButton(
+      toolbar, 'Wide', 'Enter wide view', () => this.enterWide(),
+    );
     this.fullscreenButton = this.createButton(
       toolbar, 'Full screen', 'Enter full screen', () => { void this.enterFullscreen(); },
     );
     this.closeFullscreenButton = this.createButton(
-      toolbar, '×', 'Exit full screen', () => { void this.exitFullscreen(); },
+      toolbar, '×', 'Exit full screen', () => { void this.closeExpandedView(); },
     );
     this.closeFullscreenButton.hidden = true;
     return toolbar;
@@ -291,12 +299,23 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   };
 
   private onFullscreenChange = (): void => {
-    const fullscreen = this.doc.fullscreenElement === this.root;
-    this.root.classList.toggle('drawio-interactive-fullscreen', fullscreen);
-    this.fullscreenButton.hidden = fullscreen;
-    this.closeFullscreenButton.hidden = !fullscreen;
-    this.closeFullscreenButton.disabled = !fullscreen;
+    this.updateExpandedMode();
   };
+
+  private updateExpandedMode(): void {
+    const fullscreen = this.doc.fullscreenElement === this.root;
+    if (fullscreen) this.wide = false;
+    const expanded = fullscreen || this.wide;
+    this.root.classList.toggle('drawio-interactive-fullscreen', fullscreen);
+    this.root.classList.toggle('drawio-interactive-wide', this.wide);
+    this.wideButton.hidden = expanded;
+    this.fullscreenButton.hidden = expanded;
+    this.closeFullscreenButton.hidden = !expanded;
+    this.closeFullscreenButton.disabled = !expanded;
+    this.closeFullscreenButton.setAttribute(
+      'aria-label', fullscreen ? 'Exit full screen' : 'Exit wide view',
+    );
+  }
 
   private onWheel = (event: WheelEvent): void => {
     if (!this.active || event.deltaY === 0) return;
@@ -366,6 +385,20 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.doc.removeEventListener('pointermove', this.onPanMove);
     this.doc.removeEventListener('pointerup', this.onPanEnd);
     this.doc.removeEventListener('pointercancel', this.onPanEnd);
+  }
+
+  private enterWide(): void {
+    if (!this.active || this.doc.fullscreenElement === this.root) return;
+    this.wide = true;
+    this.updateExpandedMode();
+  }
+
+  private async closeExpandedView(): Promise<void> {
+    if (this.doc.fullscreenElement === this.root) await this.exitFullscreen();
+    else {
+      this.wide = false;
+      this.updateExpandedMode();
+    }
   }
 
   private async enterFullscreen(): Promise<void> {
@@ -584,6 +617,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.zoomInButton.disabled = !ready || scale >= MAX_SCALE - SCALE_EPSILON;
     this.zoomOutButton.disabled = !ready || scale <= 1 + SCALE_EPSILON;
     this.fitButton.disabled = !ready || scale <= 1 + SCALE_EPSILON;
+    this.wideButton.disabled = !ready;
     this.fullscreenButton.disabled = !ready || typeof this.root.requestFullscreen !== 'function';
     this.editButton.disabled = !ready || this.opts.onEdit === undefined;
   }
