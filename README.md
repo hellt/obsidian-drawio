@@ -20,7 +20,7 @@ Embed, preview, and edit [draw.io](https://www.drawio.com/) (diagrams.net) diagr
 - **Offline editor, optionally** — the editor defaults to a bundled, fully offline drawio build served from a local server. Store installs don't include the bundle (~145 MB); install it with one click from the plugin settings, or switch the editor source to Online.
 - **Readable, git-friendly storage** — diagrams are saved as uncompressed, pretty-printed XML rather than a compressed blob, so diffs, sync, and version history stay meaningful.
 - **Multi-page aware** — multi-page diagrams get a compact page switcher (‹ 2 / 5 ›) under the preview, and `![[file.drawio#Page-2]]` opens the embed on the page named "Page-2".
-- **Interactive viewer (desktop)** — optionally click a preview to explore it in place: wheel/trackpad zoom, drag panning, **Fit**, and **Full screen**, with an **Edit** button when you want to change the diagram. Off by default — set **Preview click action** to **Interactive viewer**.
+- **Interactive viewer (desktop)** — optionally click a preview to explore it in place: wheel/trackpad zoom, drag panning, **Fit**, **Wide**, and **Full screen**, with an **Edit** button when you want to change the diagram. Off by default — set **Preview click action** to **Interactive viewer**.
 - **Fits into Obsidian** — follows your light/dark theme, keeps working in popped-out windows, sanitizes rendered SVG before insertion, and supports phones and tablets (preview-only there — see [Platform support](#platform-support)).
 
 ## Quick start
@@ -46,7 +46,7 @@ Code blocks and `.drawio` embeds render as SVG previews in both editing and read
 
 - **Open built-in editor** (default) — a code-block preview opens the full-screen editor; an embed opens the quick-edit modal.
 - **Open in system default app** — opens the underlying `.drawio` file in the OS default application. Code blocks have no file, so they still open the built-in editor.
-- **Interactive viewer** — explore the diagram in place (wheel/trackpad zoom, drag to pan, **Fit**, **Full screen**). Use **Edit** when you want to change it; **Edit button action** chooses whether that opens the built-in editor or the system default app (code blocks always use the built-in editor). Drag the handle under a code-block or embed preview to set its height — remembered per insertion in the note (a `<!-- drawio-viewer: height=N -->` comment above that block or embed), and kept in sync between Live Preview and Reading view.
+- **Interactive viewer** — explore the diagram in place (wheel/trackpad zoom, drag to pan, **Fit**, **Wide**, **Full screen**). **Wide** fills the Obsidian window, while **Full screen** fills the monitor. Use **Edit** when you want to change it; **Edit button action** chooses whether that opens the built-in editor or the system default app (code blocks always use the built-in editor). Drag the handle under a code-block or embed preview to set its height — remembered per insertion in the note (a `<!-- drawio-viewer: height=N -->` comment above that block or embed), and kept in sync between Live Preview and Reading view.
 - **Do nothing** — the preview is not clickable.
 
 The interactive viewer works on `` ```drawio `` blocks, `![[file.drawio]]` embeds, and the read-only `.drawio` file tab. Opening a `.drawio` file still uses the embedded editor unless **Open diagram files read-only** is on. `![[file.drawio.svg]]` / `![[file.drawio.png]]` embeds follow the same setting in both Live Preview and Reading view, except **Interactive viewer** falls back to the editor — they display as a native image, with nothing to zoom.
@@ -71,7 +71,7 @@ The interactive viewer works on `` ```drawio `` blocks, `![[file.drawio]]` embed
 | Standalone `.drawio` file tab | Inline editor (or read-only preview, opt-in) | Read-only preview | Read-only preview |
 | Multi-page page switcher & `#Page-N` embeds | Yes | Yes | Yes |
 | Light/dark theme following | Yes | Yes | Yes |
-| Interactive viewer (zoom / pan / full screen) | Yes | — | — |
+| Interactive viewer (zoom / pan / wide / full screen) | Yes | — | — |
 | Editing diagrams (modal / inline editor) | Yes | — | — |
 | Creating diagrams (ribbon, command, folder menu) | Yes | — | — |
 | Offline editor (bundled webapp + local server) | Yes | — | — |

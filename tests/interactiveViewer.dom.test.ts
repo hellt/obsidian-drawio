@@ -46,7 +46,7 @@ describe('InteractiveViewerController walking skeleton', () => {
     expect(root.classList.contains('drawio-interactive-active')).toBe(false);
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('.drawio-interactive-toolbar button'));
     expect(buttons.map((button) => button.textContent)).toEqual([
-      '+', '−', 'Fit', 'Edit', 'Full screen', '×',
+      '+', '−', 'Fit', 'Edit', 'Wide', 'Full screen', '×',
     ]);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     controller.dispose();
@@ -163,7 +163,7 @@ describe('InteractiveViewerController walking skeleton', () => {
     const zoomOut = toolbarButtons[1]!;
     const fit = toolbarButtons[2]!;
     const edit = toolbarButtons[3]!;
-    const fullscreen = toolbarButtons[4]!;
+    const fullscreen = toolbarButtons[5]!;
     expect(zoomIn.disabled).toBe(false);
     expect(zoomOut.disabled).toBe(true);
     expect(fit.disabled).toBe(true);
@@ -242,6 +242,37 @@ describe('InteractiveViewerController walking skeleton', () => {
     controller.dispose();
     if (descriptor) Object.defineProperty(document, 'fullscreenElement', descriptor);
     else delete (document as unknown as { fullscreenElement?: Element | null }).fullscreenElement;
+  });
+
+  it('enters and exits wide view without using monitor fullscreen', () => {
+    const { root, preview, controller } = fixture();
+    const requestFullscreen = vi.fn(() => Promise.resolve());
+    Object.defineProperty(root, 'requestFullscreen', { configurable: true, value: requestFullscreen });
+    preview.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const wide = root.querySelector<HTMLButtonElement>('[aria-label="Enter wide view"]')!;
+    wide.click();
+
+    expect(root.classList.contains('drawio-interactive-wide')).toBe(true);
+    expect(root.classList.contains('drawio-interactive-fullscreen')).toBe(false);
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    expect(wide.hidden).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Enter full screen"]')!.hidden).toBe(true);
+    const close = root.querySelector<HTMLButtonElement>('[aria-label="Exit wide view"]')!;
+    expect(close.hidden).toBe(false);
+
+    close.click();
+
+    expect(root.classList.contains('drawio-interactive-wide')).toBe(false);
+    expect(wide.hidden).toBe(false);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Enter full screen"]')!.hidden).toBe(false);
+    expect(controller.isActive).toBe(true);
+
+    wide.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(root.classList.contains('drawio-interactive-wide')).toBe(false);
+    expect(controller.isActive).toBe(false);
+    controller.dispose();
   });
 
   it('enters and exits fullscreen through the preview document', () => {
