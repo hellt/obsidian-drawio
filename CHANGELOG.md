@@ -8,6 +8,12 @@ The release workflow publishes the tagged version's section below as the GitHub
 release notes, so a version's section must be complete before its tag is pushed
 (see the Release process section of CLAUDE.md).
 
+## 0.8.0 - 2026-11-12
+
+### Added
+
+- **Wide** mode expands interactive previews to fill the Obsidian window, while **Full screen** continues to fill the monitor. Click **Wide** beside **Full screen**, and use **×** or Escape to return to the note.
+
 ## 0.7.2 - 2026-10-28
 
 ### Changed — action may be required
