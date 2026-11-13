@@ -8,6 +8,12 @@ The release workflow publishes the tagged version's section below as the GitHub
 release notes, so a version's section must be complete before its tag is pushed
 (see the Release process section of CLAUDE.md).
 
+## 0.9.0 - 2026-11-13
+
+### Added
+
+- **Export** in the interactive viewer replaces the **Copy** button. Its menu copies the page you're viewing to the clipboard (**Copy PNG to clipboard**) or saves it as a PNG or SVG file wherever you choose (**Save as PNG**, **Save as SVG**).
+
 ## 0.8.2 - 2026-11-12
 
 ### Added
