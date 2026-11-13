@@ -1,4 +1,8 @@
-import { MarkdownRenderChild, Notice } from 'obsidian';
+import { MarkdownRenderChild, Notice, Platform } from 'obsidian';
+import {
+  exportFileName, renderDiagramPng, renderDiagramSvg,
+  type ExportSource, type ImageFormat,
+} from './diagramImage';
 import { MAX_VIEWPORT_HEIGHT, MIN_VIEWPORT_HEIGHT } from './viewportHeight';
 
 export interface InteractiveViewerOptions {
@@ -7,9 +11,18 @@ export interface InteractiveViewerOptions {
   initialHeight?: number;
   onHeightCommit?: (height: number) => void;
   onEdit?: () => void;
-  /** Renders the page currently shown as a PNG for the Copy button. */
-  renderPng?: () => Promise<Blob>;
+  /** Feeds the toolbar's Export menu; without it the menu stays disabled. */
+  imageExport?: ImageExportSpec;
 }
+
+export interface ImageExportSpec {
+  /** Resolved when an export runs, so it always reflects the page shown. */
+  source: () => ExportSource;
+  /** The PNG export scale setting. */
+  pngScale: () => number;
+}
+
+type ExportAction = 'copy' | ImageFormat;
 
 export interface BindSvgOptions {
   /** Page changes replace the SVG but must not resize the surrounding insertion. */
@@ -39,9 +52,9 @@ const MAX_SCALE = 8;
 const SCALE_EPSILON = 0.0001;
 /** Pointer travel (px) below which a resize gesture is a click, not a resize. */
 const RESIZE_COMMIT_THRESHOLD = 2;
-const COPY_LABEL = 'Copy';
-/** How long the Copy button shows its "Copied"/"Copy failed" outcome. */
-const COPY_FEEDBACK_MS = 1500;
+const EXPORT_LABEL = 'Export ▾';
+/** How long the Export button shows an outcome ("Copied", "Saved", …). */
+const EXPORT_FEEDBACK_MS = 1500;
 
 /**
  * Minimal interactive-viewer lifecycle and activation shell.
@@ -63,9 +76,13 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private wideButton!: HTMLButtonElement;
   private fullscreenButton!: HTMLButtonElement;
   private editButton!: HTMLButtonElement;
-  private copyButton!: HTMLButtonElement;
-  private copying = false;
-  private copyFeedbackTimer: number | null = null;
+  private exportWrap!: HTMLElement;
+  private exportButton!: HTMLButtonElement;
+  private exportMenu!: HTMLElement;
+  private copyItem!: HTMLButtonElement;
+  private exportItems: HTMLButtonElement[] = [];
+  private exporting = false;
+  private exportFeedbackTimer: number | null = null;
   private closeFullscreenButton!: HTMLButtonElement;
   private resizeHandle: HTMLElement;
   private doc: Document;
@@ -151,6 +168,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
 
   deactivate(): void {
     this.endPan();
+    this.closeExportMenu();
     this.active = false;
     this.wide = false;
     this.root.classList.remove('drawio-interactive-active');
@@ -183,7 +201,8 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.doc.removeEventListener('pointerup', this.onPanEnd);
     this.disconnectMeasureObserver();
     this.cancelFrame();
-    this.clearCopyFeedback();
+    this.closeExportMenu();
+    this.clearExportFeedback();
     this.toolbar.remove();
     this.resizeHandle.remove();
     this.preview.classList.remove('drawio-interactive-viewport');
@@ -246,9 +265,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.editButton = this.createButton(
       toolbar, 'Edit', 'Edit diagram', () => { void this.runEditAction(); },
     );
-    this.copyButton = this.createButton(
-      toolbar, COPY_LABEL, 'Copy diagram as PNG', () => { void this.runCopyAction(); },
-    );
+    this.createExportMenu(toolbar);
     this.wideButton = this.createButton(
       toolbar, 'Wide', 'Enter wide view', () => this.enterWide(),
     );
@@ -305,11 +322,20 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   private onDocumentClick = (event: MouseEvent): void => {
     if (!this.active) return;
     const target = this.eventNode(event);
+    if (target && this.isExportMenuOpen() && !this.exportWrap.contains(target)) {
+      this.closeExportMenu();
+    }
     if (!target || !this.root.contains(target)) this.deactivate();
   };
 
   private onDocumentKeydown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
+    if (this.isExportMenuOpen()) {
+      // Escape closes the open menu first, not the whole viewer.
+      this.closeExportMenu();
+      this.exportButton.focus();
+      return;
+    }
     if (this.doc.fullscreenElement === this.root) void this.exitFullscreen();
     this.deactivate();
   };
@@ -319,6 +345,8 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   };
 
   private updateExpandedMode(): void {
+    // The menu is positioned for the layout it opened in.
+    this.closeExportMenu();
     const fullscreen = this.doc.fullscreenElement === this.root;
     if (fullscreen) this.wide = false;
     const expanded = fullscreen || this.wide;
@@ -569,6 +597,7 @@ export class InteractiveViewerController extends MarkdownRenderChild {
   };
 
   private onWindowResize = (): void => {
+    this.closeExportMenu();
     this.updateWideLayout();
     // Same isEnabled gate as every other entry point: after the click action
     // is switched away, a window resize must not re-apply the viewport.
@@ -713,25 +742,151 @@ export class InteractiveViewerController extends MarkdownRenderChild {
     this.wideButton.disabled = !ready;
     this.fullscreenButton.disabled = !ready || typeof this.root.requestFullscreen !== 'function';
     this.editButton.disabled = !ready || this.opts.onEdit === undefined;
-    this.copyButton.disabled = !ready || this.copying || !this.canCopy();
+    this.exportButton.disabled = !ready || this.exporting || this.opts.imageExport === undefined;
+    this.copyItem.disabled = !this.canCopy();
   }
+
+  /**
+   * Export ▾ opens a small menu inside the viewer. Obsidian's Menu attaches
+   * to <body>, which renders beneath native fullscreen and the top-layer wide
+   * view, so the menu is the viewer's own element — shown as a manual popover
+   * where supported, since an absolutely positioned dropdown is clipped by
+   * Live Preview's `contain: paint` on short diagrams.
+   */
+  private createExportMenu(toolbar: HTMLElement): void {
+    const wrap = toolbar.createDiv({ cls: 'drawio-interactive-export' });
+    this.exportWrap = wrap;
+    this.exportButton = this.createButton(
+      wrap, EXPORT_LABEL, 'Export diagram', () => this.toggleExportMenu(),
+    );
+    this.exportButton.setAttribute('aria-haspopup', 'menu');
+    this.exportButton.setAttribute('aria-expanded', 'false');
+    this.exportMenu = wrap.createDiv({ cls: 'drawio-interactive-menu' });
+    this.exportMenu.setAttribute('role', 'menu');
+    this.exportMenu.hidden = true;
+    this.exportMenu.addEventListener('keydown', this.onExportMenuKeydown);
+    const item = (label: string, action: ExportAction): HTMLButtonElement => {
+      const button = this.createButton(this.exportMenu, label, label, () => {
+        void this.runExport(action);
+      });
+      button.disabled = false;
+      button.setAttribute('role', 'menuitem');
+      return button;
+    };
+    this.copyItem = item('Copy PNG to clipboard', 'copy');
+    this.exportItems = [this.copyItem, item('Save as PNG', 'png'), item('Save as SVG', 'svg')];
+  }
+
+  private isExportMenuOpen(): boolean {
+    return !this.exportMenu.hidden;
+  }
+
+  private toggleExportMenu(): void {
+    if (this.isExportMenuOpen()) this.closeExportMenu();
+    else this.openExportMenu();
+  }
+
+  private openExportMenu(): void {
+    if (this.exportButton.disabled) return;
+    const menu = this.exportMenu;
+    menu.hidden = false;
+    this.exportButton.setAttribute('aria-expanded', 'true');
+    if (typeof menu.showPopover === 'function') {
+      menu.setAttribute('popover', 'manual');
+      try {
+        menu.showPopover();
+        this.positionExportMenu();
+      } catch {
+        menu.removeAttribute('popover');
+      }
+    }
+    // A scroll would leave the top-layer menu floating away from its button.
+    this.doc.addEventListener('scroll', this.onExportMenuScroll, true);
+    this.exportItems.find((button) => !button.disabled)?.focus();
+  }
+
+  /** Under the Export button, right-aligned; above it when there is no room below. */
+  private positionExportMenu(): void {
+    const win = this.doc.defaultView;
+    if (!win) return;
+    const anchor = this.exportButton.getBoundingClientRect();
+    const menu = this.exportMenu;
+    const below = anchor.bottom + 4;
+    const top = below + menu.offsetHeight > win.innerHeight
+      ? Math.max(0, anchor.top - 4 - menu.offsetHeight)
+      : below;
+    menu.style.top = `${top}px`;
+    menu.style.left = `${Math.max(0, anchor.right - menu.offsetWidth)}px`;
+  }
+
+  private closeExportMenu(): void {
+    const menu = this.exportMenu;
+    if (menu.hidden) return;
+    menu.hidden = true;
+    this.exportButton.setAttribute('aria-expanded', 'false');
+    this.doc.removeEventListener('scroll', this.onExportMenuScroll, true);
+    if (menu.hasAttribute('popover')) {
+      try {
+        menu.hidePopover();
+      } catch { /* already hidden */ }
+      menu.removeAttribute('popover');
+      menu.style.removeProperty('top');
+      menu.style.removeProperty('left');
+    }
+  }
+
+  private onExportMenuScroll = (): void => {
+    this.closeExportMenu();
+  };
+
+  private onExportMenuKeydown = (event: KeyboardEvent): void => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const enabled = this.exportItems.filter((button) => !button.disabled);
+    if (enabled.length === 0) return;
+    const current = enabled.indexOf(this.doc.activeElement as HTMLButtonElement);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    enabled[(current + step + enabled.length) % enabled.length]!.focus();
+  };
 
   private canCopy(): boolean {
     const win = this.doc.defaultView;
-    return this.opts.renderPng !== undefined && !!win
-      && typeof win.ClipboardItem === 'function'
+    return !!win && typeof win.ClipboardItem === 'function'
       && typeof win.navigator.clipboard?.write === 'function';
   }
 
-  private async runCopyAction(): Promise<void> {
-    const render = this.opts.renderPng;
-    const win = this.doc.defaultView;
-    if (!render || !win || this.copying || !this.canCopy()) return;
-    this.copying = true;
-    this.showCopyLabel('Copying…', false);
+  private async runExport(action: ExportAction): Promise<void> {
+    this.closeExportMenu();
+    const spec = this.opts.imageExport;
+    if (!spec || this.exporting) return;
+    this.exporting = true;
     this.updateControls();
+    try {
+      if (action === 'copy') {
+        this.showExportLabel('Copying…', false);
+        await this.copyPng(spec);
+        this.showExportLabel('Copied', true);
+      } else if (await this.saveImage(spec, action)) {
+        this.showExportLabel('Saved', true);
+      } else {
+        this.showExportLabel(EXPORT_LABEL, false); // dialog cancelled
+      }
+    } catch (err) {
+      console.error('[drawio] export failed:', err);
+      this.showExportLabel('Export failed', true);
+      new Notice(`Drawio: could not export the diagram — ${String(err)}`);
+    } finally {
+      this.exporting = false;
+      this.updateControls();
+    }
+  }
+
+  private async copyPng(spec: ImageExportSpec): Promise<void> {
+    const win = this.doc.defaultView;
+    if (!win || !this.canCopy()) throw new Error('the clipboard does not accept images here');
+    const { xml, page } = spec.source();
     let renderError: unknown = null;
-    const png = render().catch((err: unknown) => {
+    const png = renderDiagramPng(xml, page, spec.pngScale(), this.doc).catch((err: unknown) => {
       renderError = err;
       throw err;
     });
@@ -740,38 +895,47 @@ export class InteractiveViewerController extends MarkdownRenderChild {
       // Hand the clipboard a pending PNG instead of awaiting the render
       // first: the write is issued while this click still has focus.
       await win.navigator.clipboard.write([new win.ClipboardItem({ 'image/png': png })]);
-      this.showCopyLabel('Copied', true);
     } catch (err) {
-      const cause = renderError ?? err;
-      console.error('[drawio] copy as PNG failed:', cause);
-      this.showCopyLabel('Copy failed', true);
-      new Notice(`Drawio: could not copy the diagram — ${String(cause)}`);
-    } finally {
-      this.copying = false;
-      this.updateControls();
+      // A failed render rejects the write too; report the cause, not that.
+      throw renderError ?? err;
     }
+  }
+
+  /** Native Save dialog, then render and write. False when cancelled. */
+  private async saveImage(spec: ImageExportSpec, format: ImageFormat): Promise<boolean> {
+    if (!Platform.isDesktopApp) throw new Error('saving files is only available on desktop');
+    const source = spec.source();
+    const { chooseImagePath, writeImageFile } = await import('../desktop/saveImage');
+    const path = await chooseImagePath(exportFileName(source), format);
+    if (path === null) return false;
+    this.showExportLabel('Saving…', false);
+    const image = format === 'png'
+      ? await renderDiagramPng(source.xml, source.page, spec.pngScale(), this.doc)
+      : renderDiagramSvg(source.xml, source.page, this.doc);
+    await writeImageFile(path, image);
+    return true;
   }
 
   /**
    * In-button feedback: Obsidian's notices render beneath native fullscreen
    * and the top-layer wide view, so the button itself reports the outcome.
    */
-  private showCopyLabel(label: string, revert: boolean): void {
-    this.clearCopyFeedback();
-    this.copyButton.textContent = label;
+  private showExportLabel(label: string, revert: boolean): void {
+    this.clearExportFeedback();
+    this.exportButton.textContent = label;
     if (!revert || this.disposed) return;
     const win = this.doc.defaultView;
     if (!win) return;
-    this.copyFeedbackTimer = win.setTimeout(() => {
-      this.copyFeedbackTimer = null;
-      this.copyButton.textContent = COPY_LABEL;
-    }, COPY_FEEDBACK_MS);
+    this.exportFeedbackTimer = win.setTimeout(() => {
+      this.exportFeedbackTimer = null;
+      this.exportButton.textContent = EXPORT_LABEL;
+    }, EXPORT_FEEDBACK_MS);
   }
 
-  private clearCopyFeedback(): void {
-    if (this.copyFeedbackTimer === null) return;
-    this.doc.defaultView?.clearTimeout(this.copyFeedbackTimer);
-    this.copyFeedbackTimer = null;
+  private clearExportFeedback(): void {
+    if (this.exportFeedbackTimer === null) return;
+    this.doc.defaultView?.clearTimeout(this.exportFeedbackTimer);
+    this.exportFeedbackTimer = null;
   }
 
   private scheduleViewBoxWrite(): void {

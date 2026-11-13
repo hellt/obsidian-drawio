@@ -44,9 +44,12 @@ describe('InteractiveViewerController walking skeleton', () => {
     const { root, controller } = fixture();
     expect(controller.isActive).toBe(false);
     expect(root.classList.contains('drawio-interactive-active')).toBe(false);
-    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('.drawio-interactive-toolbar button'));
+    // Toolbar buttons, not the Export menu's items (tests/interactiveViewerExport).
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(
+      '.drawio-interactive-toolbar button:not([role="menuitem"])',
+    ));
     expect(buttons.map((button) => button.textContent)).toEqual([
-      '+', '−', 'Fit', 'Edit', 'Copy', 'Wide', 'Full screen', '×',
+      '+', '−', 'Fit', 'Edit', 'Export ▾', 'Wide', 'Full screen', '×',
     ]);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     controller.dispose();

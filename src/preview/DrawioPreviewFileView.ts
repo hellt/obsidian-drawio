@@ -4,7 +4,6 @@ import { renderPreview } from './ViewerRenderer';
 import { renderPageControl } from './pageControl';
 import { resolveClickAction, resolveEditButtonAction, openWithDefaultApp } from './clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from './interactiveMount';
-import { renderDiagramPng } from './diagramPng';
 import { getDiagramPages, ensureMxfile } from '../model/xmlUtils';
 import { FileSource } from '../file/FileSource';
 import type DrawioPlugin from '../main';
@@ -91,9 +90,12 @@ export class DrawioPreviewFileView extends TextFileView {
             openWithDefaultApp(this.plugin.app, this.file.path);
           }
         },
-        renderPng: () => renderDiagramPng(
-          this.data, currentPage, this.plugin.settings.pngExportScale, preview.ownerDocument,
-        ),
+        imageExport: {
+          source: () => ({
+            xml: this.data, page: currentPage, name: this.file?.basename ?? 'diagram',
+          }),
+          pngScale: () => this.plugin.settings.pngExportScale,
+        },
       });
     }
   }

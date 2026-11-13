@@ -1,6 +1,7 @@
 import {
   InteractiveViewerController,
   type BindSvgOptions,
+  type ImageExportSpec,
 } from './interactiveViewer';
 
 export interface InteractiveMountSpec {
@@ -16,8 +17,8 @@ export interface InteractiveMountSpec {
   loadPersistedHeight?: () => Promise<number | null>;
   onHeightCommit?: (height: number) => void;
   onEdit?: () => void;
-  /** Renders the page currently shown as a PNG (the toolbar's Copy button). */
-  renderPng?: () => Promise<Blob>;
+  /** Feeds the toolbar's Export menu (the page shown, the PNG export scale). */
+  imageExport?: ImageExportSpec;
 }
 
 export interface InteractiveMountHandle {
@@ -55,7 +56,7 @@ export function mountInteractiveViewer(
       initialHeight: spec.initialHeight,
       onHeightCommit: spec.onHeightCommit,
       onEdit: spec.onEdit,
-      renderPng: spec.renderPng,
+      imageExport: spec.imageExport,
     });
     controller = built;
     built.bindSvg(preview.querySelector('svg'));

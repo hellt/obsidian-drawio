@@ -264,12 +264,23 @@ name; the manifest id inside is `drawio-editor`).
   to keep their flex column, which the fit depends on. jsdom can't lay any of
   this out; verify layout changes in a real Chromium against those Obsidian
   rules.
-- **The viewer's Copy button rasterizes a fresh light-theme `renderPreview` of the
-  shown page on a canvas (`src/preview/diagramPng.ts`) — it deliberately does NOT
-  use `HeadlessExporter`.** The headless drawio export needs the ~145 MB offline
-  editor installed (or Online mode), takes a second or more, and stalls in popout
-  windows; the bundled viewer has none of those limits and its output matched
-  drawio's for HTML labels and fonts when checked in Chromium.
+- **The viewer's Export menu (Copy PNG / Save as PNG / Save as SVG) renders a
+  fresh light-theme `renderPreview` of the shown page (`src/preview/diagramImage.ts`;
+  PNGs are rasterized on a canvas) — it deliberately does NOT use `HeadlessExporter`.**
+  The headless drawio export needs the ~145 MB offline editor installed (or Online
+  mode), takes a second or more, and stalls in popout windows; the bundled viewer
+  has none of those limits and its output matched drawio's for HTML labels and
+  fonts when checked in Chromium. Two more non-obvious choices:
+  - **Save uses `electron.remote.dialog.showSaveDialog` + `node:fs`
+    (`src/desktop/saveImage.ts`, typed by `src/desktop/electron.d.ts`)** — the same
+    remote dialog Obsidian's own Canvas "Export as image" and PDF export call, so it
+    exists wherever those do. The controller reaches it only via a
+    `Platform.isDesktopApp`-checked lazy import (mobile rule above); tests alias
+    `electron` to `tests/electron-stub.ts`.
+  - **The menu is the viewer's own element shown as a manual popover**, not
+    Obsidian's `Menu`: `Menu` attaches to `<body>`, which renders beneath native
+    fullscreen and the top-layer wide view, and a plain absolute dropdown is
+    clipped by Live Preview's `contain: paint` on short (≥80 px) previews.
 - **`Vault.createFolder()` requires Obsidian 1.4.0+** (it carries a `@since 1.4.0`
   JSDoc tag in `obsidian.d.ts`). `src/file/createDiagram.ts` originally called it
   unguarded, tripping `obsidianmd/no-unsupported-api` while `minAppVersion` was

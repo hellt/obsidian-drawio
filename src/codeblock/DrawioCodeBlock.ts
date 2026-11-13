@@ -3,7 +3,6 @@ import { renderPreview } from '../preview/ViewerRenderer';
 import { renderPageControl } from '../preview/pageControl';
 import { resolveClickAction, resolveEditButtonAction } from '../preview/clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from '../preview/interactiveMount';
-import { renderDiagramPng } from '../preview/diagramPng';
 import { SectionLifecycle } from '../preview/sectionLifecycle';
 import {
   readCodeBlockViewportHeight, writeCodeBlockViewportHeight,
@@ -84,9 +83,10 @@ async function renderCodeBlock(
             plugin.openEditor(new CodeBlockSource(plugin.app, ctx, el, source));
           }
         },
-        renderPng: () => renderDiagramPng(
-          source, currentPage, plugin.settings.pngExportScale, preview.ownerDocument,
-        ),
+        imageExport: {
+          source: () => ({ xml: source, page: currentPage, name: noteName(ctx.sourcePath) }),
+          pngScale: () => plugin.settings.pngExportScale,
+        },
       });
       interactive = handle;
       lifecycle.register(() => handle.dispose());
@@ -106,4 +106,11 @@ async function renderCodeBlock(
       plugin.openEditor(new CodeBlockSource(plugin.app, ctx, el, source));
     }
   });
+}
+
+/** A code block's export file name: its note's name, without folder or extension. */
+function noteName(sourcePath: string): string {
+  const file = sourcePath.slice(sourcePath.lastIndexOf('/') + 1);
+  const dot = file.lastIndexOf('.');
+  return (dot > 0 ? file.slice(0, dot) : file) || 'diagram';
 }

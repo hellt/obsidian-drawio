@@ -60,6 +60,28 @@ body.drawio-align-left .drawio-preview > svg { margin: 0; }
   transform: scale(.94);
 }
 .drawio-interactive-toolbar button[hidden] { display: none !important; }
+/* Export ▾ menu. Shown as a manual popover (top layer) where supported, with
+   top/left set inline from the button, so neither Live Preview's
+   `contain: paint` nor fullscreen/wide view hides it; otherwise it drops down
+   in place. The base block also resets the UA [popover] box styles. */
+.drawio-interactive-export { position: relative; display: flex; }
+.drawio-interactive-menu {
+  position: absolute; z-index: 4; top: calc(100% + 4px); right: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 170px; margin: 0; padding: 4px;
+  border: 1px solid var(--background-modifier-border); border-radius: 6px;
+  background: var(--background-secondary); color: var(--text-normal);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+  -webkit-app-region: no-drag;
+}
+.drawio-interactive-menu[hidden] { display: none; }
+.drawio-interactive-menu:popover-open { position: fixed; inset: auto; overflow: visible; }
+.drawio-interactive-toolbar .drawio-interactive-menu button {
+  justify-content: flex-start; width: 100%; padding: 5px 10px;
+  border: 0; background: transparent; box-shadow: none; color: inherit;
+  white-space: nowrap; text-align: left;
+}
+.drawio-interactive-toolbar .drawio-interactive-menu button:disabled { opacity: .5; cursor: default; }
 @media (hover: none) {
   .drawio-interactive-toolbar { opacity: 1; }
 }

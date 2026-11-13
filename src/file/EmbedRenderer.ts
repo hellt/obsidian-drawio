@@ -6,7 +6,6 @@ import {
   resolveClickAction, resolveEditButtonAction, openWithDefaultApp,
 } from '../preview/clickAction';
 import { mountInteractiveViewer, type InteractiveMountHandle } from '../preview/interactiveMount';
-import { renderDiagramPng } from '../preview/diagramPng';
 import { SectionLifecycle } from '../preview/sectionLifecycle';
 import {
   readEmbedViewportHeight, writeEmbedViewportHeight,
@@ -250,9 +249,10 @@ class DrawioFileEmbed extends MarkdownRenderChild {
               openWithDefaultApp(this.plugin.app, this.file.path);
             }
           },
-          renderPng: () => renderDiagramPng(
-            xml, this.currentPage, this.plugin.settings.pngExportScale, preview.ownerDocument,
-          ),
+          imageExport: {
+            source: () => ({ xml, page: this.currentPage, name: this.file.basename }),
+            pngScale: () => this.plugin.settings.pngExportScale,
+          },
         });
         scheduleStoredEmbedHeight(
           this.plugin, this.interactive, this.sourcePath, this.file, this.subpath,
@@ -494,9 +494,10 @@ async function renderEmbedInto(
               openWithDefaultApp(plugin.app, file.path);
             }
           },
-          renderPng: () => renderDiagramPng(
-            xml, currentPage, plugin.settings.pngExportScale, preview.ownerDocument,
-          ),
+          imageExport: {
+            source: () => ({ xml, page: currentPage, name: file.basename }),
+            pngScale: () => plugin.settings.pngExportScale,
+          },
         });
         interactive = mounted;
         // Single teardown seam: dispose covers both the lazy listeners and
